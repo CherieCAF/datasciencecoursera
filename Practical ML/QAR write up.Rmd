@@ -73,41 +73,61 @@ summary(RocImp_exclNZV)
 ```
 
 Three model were selected (with the accuracy statistic from the confusionMatrix alongside):
-1. with all 58 remaining variables (91%)
+1. with all 58 remaining variables (99.99% accuracy)
 2. included variables with importance > 70% (65% accuracy)
-3. variables with importance > 60% (93% accuracy)
+3. variables with importance > 60% (92.7% accuracy)
 
-To improve processing speed parallel processing options were used to rund the model. The confusion matrix on the testing set is below. Method "gbm" is used and "PCA" pre-processing.
+The train function is used to evaluate, using 5 fold resampling, the effect of model tuning paramters on performance, choose the "optimal" model across these parameters and estimate model performance from a training set.
+A gradient boosting machine (GBM) model was used with three main tuning parameters:
+- number of iterations set to (1:30)*50
+- complexity of the tree set through the interaction.depth parameter at (2, 5, 13)
+- learning rate: how quickly the algorithm adapts, called shrikage (set at 0.1)
+- the minimum number of training set samples in a node to commence splitting (n. minobsinnode=10)
+
+To improve processing speed parallel processing options were used to run the model. The confusion matrix on the testing set is below. 
+
 ```{r, include=FALSE, cache=TRUE }
 set.seed(125)
 library(doMC)
 registerDoMC(cores=5)
 ##All subsequent models are then run in parallel
-gbmGrid <- expand.grid(interaction.depth=c(2,5,13), n.trees=c(150:2000), .shrinkage=c(0.001, .01))
+gbmGrid <- expand.grid(interaction.depth=c(2,5,13), n.trees=c(1:30)*50, shrinkage=.01, n.minobsinnode=10)
 fitControl <- trainControl(method="cv", number=5)
-modelClass <- train(classe ~ accel_arm_x + magnet_arm_x +magnet_arm_y +roll_dumbbell + pitch_dumbbell + magnet_dumbbell_x + magnet_dumbbell_y +pitch_forearm + accel_forearm_x + magnet_forearm_x + cvtd_timestamp + num_window +roll_belt +accel_belt_z+magnet_belt_y+magnet_belt_z+roll_arm +pitch_arm+total_accel_arm+accel_arm_z+magnet_arm_z+roll_dumbbell+pitch_dumbbell+yaw_dumbbell+total_accel_dumbbell + accel_dumbbell_x + accel_dumbbell_y + accel_dumbbell_z + roll_forearm + pitch_forearm + total_accel_forearm + accel_forearm_x + magnet_forearm_x + magnet_forearm_y + magnet_forearm_z, data=training3, method="gbm", trControl=fitControl, preProc=c("pca"))
+modelClass <- train(classe ~ ., data=training3, method="gbm",trControl=fitControl, verbose=FALSE, tuneGrid=gbmGrid, preProc=c("pca"))
 cM <- confusionMatrix(training3$classe, predict(modelClass, training3[,-58]))
 ```
 The confusionMatrix below shows the results compared to the actual classe in the training set.
 ```{r, echo=FALSE}
 cM
-plot(modelClass)
 ```
 
 The model was run on the testing set and the confusion Matrix of model, which is printed below, created.
+The accuracy of the model on the testing data set is 97.54%. This compares to a 99.99% accuracy on the testing set. The difference is the out of sample error which is always higher than the in sample error (due to overfitting of the model.
+
 ```{r, echo=FALSE}
 library(caret)
 predClass <- predict(modelClass, testing3[,-58])
 cMPred <- confusionMatrix(testing3$classe, predClass)
 cMPred
 ```
+A plots below examine the relationship between the estimates of performance and the tuning parameters.
+
+```{r, echo=FALSE}
+trellis.par.set(caretTheme())
+plot(modelClass)
+
+plot(modelClass, metric = "Kappa", plotType = "level", scales = list(x = list(rot = 90)))
+```
 
 The model was used to predict the classe of the 20 test cases which were submitted to Coursera.
 ```{r, echo=FALSE, cache=TRUE}
-library(caret)
 answers <- predict(modelClass, testCases3[,-58])
 answers
 ```
+This resulted in 19 correct answers and 1 error. Based on these results degree of impurity is measured as follows:
+Misclassification: `r 1/20`; 
+Gini: `r 1- ((1/20)^2 +(19/20)^2)`; and 
+No Information Rate: `r -(1/20*log2(1/20)+19/20*log2(19/20))`.
 
 20 Individual files were created using the code below which was provided.
 pml_write_files = function(x){
