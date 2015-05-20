@@ -1,0 +1,142 @@
+---
+title: "Quality of Weight lifting exercises"
+author: "Cherie"
+date: "18/05/2015"
+output: html_document
+---
+
+#Overview
+In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and predict whether they performed barbell lifts correctly and incorrectly in 5 different ways (classe). 
+
+The data link is https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+This write up document describes the analysis. 
+
+#Getting and cleaning data
+The dataset was split in a training (60%) and testing (40%) set. Columns with a significant number (96%) of Missing values (NA) were removed and columns with significant Near-zero-values. Additionally, the X column was identified as a confounding variable and removed. The classes of the training and test sets were unified.
+```{r, cache=TRUE, include=FALSE }
+#loading data
+data <- read.csv("pml-training.csv")
+library(caret)
+set.seed(125)
+inTrain <- createDataPartition(y=data$classe, p=.6, list=F)
+training <- data[inTrain,]
+testing <- data[-inTrain,]
+
+testCases <- read.csv("pml-testing.csv")
+```
+
+```{r, echo=TRUE, cache=TRUE}
+dim(training); dim(testing)
+```
+
+```{r, include=FALSE, cache=TRUE}
+# identifying and removing colums where NA values account for 96%
+colNA <- colMeans(is.na(training))
+training2<- training[, colNA < .96]
+testing2<- testing[, colNA < .96]
+testCases2 <- testCases[, colNA < .96]
+#removing column 1 "X" which is a confounding variable 
+training2 <- training2[, -1]
+testing2 <- testing2[, -1]
+testCases2 <- testCases2[,-1]
+```
+
+```{r, include=FALSE, cache=TRUE}
+library(caret)
+nzv <- nearZeroVar(training2)
+training3 <- training2[,-nzv]; 
+testing3 <- testing2[,-nzv]; 
+testCases3 <- testCases2[,-nzv]
+```
+
+```{r, include=FALSE, cache=TRUE}
+classTR <- class(training3)
+class(testing3) <- classTR
+class(testCases3) <- classTR
+```
+
+##Exploratory Data Analysis
+The remaining data (58 variables) was reviewed with functions dim, str, summary. The distribution of the outcome variable was reviewed and featurePlots of the 58 variables were run.
+
+```{r, echo=FALSE, fig.height=3, fig.width=4}
+(library(lattice))
+histogram(testing3$classe)
+```
+
+##Variable Importance and model selection
+Relative importance is assessed using varImp function before and after NZV were removed. NZV proved to have little impact.
+```{r, echo=TRUE, cache=TRUE }
+RocImp_inclNZV <- filterVarImp(x=training2[, -ncol(training2)], y=training2$classe)
+RocImp_exclNZV <- filterVarImp(x=training3[, -ncol(training3)], y=training3$classe)
+summary(RocImp_exclNZV)
+```
+
+Three model were selected (with the accuracy statistic from the confusionMatrix alongside):
+1. with all 58 remaining variables (99.99% accuracy)
+2. included variables with importance > 70% (65% accuracy)
+3. variables with importance > 60% (92.7% accuracy)
+
+The train function is used to evaluate, using 5 fold resampling, the effect of model tuning paramters on performance, choose the "optimal" model across these parameters and estimate model performance from a training set.
+A gradient boosting machine (GBM) model was used with three main tuning parameters:
+- number of iterations set to (1:30)*50
+- complexity of the tree set through the interaction.depth parameter at (2, 5, 13)
+- learning rate: how quickly the algorithm adapts, called shrikage (set at 0.1)
+- the minimum number of training set samples in a node to commence splitting (n. minobsinnode=10)
+
+To improve processing speed parallel processing options were used to run the model. The confusion matrix on the testing set is below. 
+
+```{r, include=FALSE, cache=TRUE }
+set.seed(125)
+library(doMC)
+registerDoMC(cores=5)
+##All subsequent models are then run in parallel
+gbmGrid <- expand.grid(interaction.depth=c(2,5,13), n.trees=c(1:30)*50, shrinkage=.01, n.minobsinnode=10)
+fitControl <- trainControl(method="cv", number=5)
+modelClass <- train(classe ~ ., data=training3, method="gbm",trControl=fitControl, verbose=FALSE, tuneGrid=gbmGrid, preProc=c("pca"))
+cM <- confusionMatrix(training3$classe, predict(modelClass, training3[,-58]))
+```
+The confusionMatrix below shows the results compared to the actual classe in the training set.
+```{r, echo=FALSE}
+cM
+```
+
+The model was run on the testing set and the confusion Matrix of model, which is printed below, created.
+The accuracy of the model on the testing data set is 97.54%. This compares to a 99.99% accuracy on the testing set. The difference is the out of sample error which is always higher than the in sample error (due to overfitting of the model.
+
+```{r, echo=FALSE}
+library(caret)
+predClass <- predict(modelClass, testing3[,-58])
+cMPred <- confusionMatrix(testing3$classe, predClass)
+cMPred
+```
+A plots below examine the relationship between the estimates of performance and the tuning parameters.
+
+```{r, echo=FALSE}
+trellis.par.set(caretTheme())
+plot(modelClass)
+
+plot(modelClass, metric = "Kappa", plotType = "level", scales = list(x = list(rot = 90)))
+```
+
+The model was used to predict the classe of the 20 test cases which were submitted to Coursera.
+```{r, echo=FALSE, cache=TRUE}
+answers <- predict(modelClass, testCases3[,-58])
+answers
+```
+This resulted in 19 correct answers and 1 error. Based on these results degree of impurity is measured as follows:
+Misclassification: `r 1/20`; 
+Gini: `r 1- ((1/20)^2 +(19/20)^2)`; and 
+No Information Rate: `r -(1/20*log2(1/20)+19/20*log2(19/20))`.
+
+20 Individual files were created using the code below which was provided.
+pml_write_files = function(x){
++     n = length(x)
++     for(i in 1:n){
++         filename = paste0("problem_id_",i,".txt")
++         write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
++     }
++ }
+pml_write_files(answers)
+
+
