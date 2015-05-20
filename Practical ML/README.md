@@ -1,1 +1,0 @@
-This repository contains the documents for the Practical Machine Learning course Project.

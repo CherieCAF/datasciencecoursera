@@ -14,8 +14,7 @@ This write up document describes the analysis.
 
 #Getting and cleaning data
 The dataset was split in a training (60%) and testing (40%) set. Columns with a significant number (96%) of Missing values (NA) were removed and columns with significant Near-zero-values. Additionally, the X column was identified as a confounding variable and removed. The classes of the training and test sets were unified.
-```{r, cache=TRUE, include=FALSE }
-#loading data
+```{r, cache=TRUE, include=FALSE}
 data <- read.csv("pml-training.csv")
 library(caret)
 set.seed(125)
