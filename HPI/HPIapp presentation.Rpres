@@ -1,0 +1,64 @@
+My HPIapp Presentation
+========================================================
+author: Cherie
+date: `r date()`
+transition: rotate
+
+A simple House Price Index App
+========================================================
+
+This simple app allows you to view the House Price Index for a country in the EU. 
+
+HPIs have a variety of potential uses:
+
+- for assessing housing affordability over time
+- a measure of specific price trends
+- for inflation targeting
+- for monitoring economic imbalances and financial stability
+- as input for national accounts purposes
+- as input to economic forecasting and analysis
+- as input for decision making in respect of the house market
+
+Generally, HPIs can be considered suited for cross-country economic comparisons of the evolution of house prices.
+
+
+Overall HPI for the EU and EA
+========================================================
+HPIs cover all residential properties purchased by households in the reference period. The HPI differs across the European Union and European Economic Area. The European Economic Area (EA) includes EU countries and also Iceland, Liechtenstein and Norway. It allows them to be part of the EU 's single market.
+```{r, echo=FALSE}
+library(ggplot2)
+library(dplyr)
+library(SmarterPoland)
+tmp <- getEurostatRCV("teicp270") 
+tmp <- tmp[complete.cases(tmp),]
+tmp <- filter(tmp, unit=="I2010_NSA")
+tmp$geo <- as.character(tmp$geo)
+countries <- sort(unique(tmp$geo)) 
+EU <- tmp[tmp$geo==c("EU", "EA"),]
+p <- ggplot(EU, aes(x=time, y=value, group=geo, colour=geo))
+                p <- p + geom_line() + facet_wrap(~geo, nrow=6) + theme(legend.position="none")
+                p <- p + geom_smooth(linetype="dotted", col="black")
+print(p)
+
+```
+
+How did HPIs differ across the EA?
+========================================================
+
+```{r, echo=FALSE}
+p <- ggplot(tmp, aes(x=time, y=value, group=geo, colour=geo))
+                p <- p + geom_line() + facet_wrap(~geo, nrow=6) + theme(legend.position="none")
+                p <- p + geom_smooth(linetype="dotted", col="black")
+                
+print(p)
+```
+
+References and sources
+===
+
+- The House Price Index (HPI) measures price changes of all residential properties purchased by households (flats, detached houses, terraced houses, etc.), both new and existing, independently of their final use and their previous owners. Only market prices are considered, self-build dwellings are therefore excluded. The land component is included.
+
+- The url for EuroStat website is: http://ec.europa.eu/eurostat/data/database
+
+- The file is "House Price Index (2010 =100) - quarterly data (teicp270)".
+
