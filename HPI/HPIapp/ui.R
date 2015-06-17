@@ -1,14 +1,14 @@
 library(shiny)
 library(ggplot2)
 library(dplyr)
-library(SmarterPoland)
+library(eurostat)
 
-tmp <- getEurostatRCV("teicp270") 
+tmp <- get_eurostat("teicp270", update_cache=TRUE)
 tmp <- tmp[complete.cases(tmp),]
-
 tmp <- filter(tmp, unit=="I2010_NSA")
-tmp$geo <- as.character(tmp$geo)
-countries <- sort(unique(tmp$geo)) 
+tmp1 <- label_eurostat(tmp)
+tmp1$geo <- as.character(tmp1$geo)
+countries <- sort(unique(tmp1$geo))
 
 shinyUI(pageWithSidebar(
         
@@ -23,9 +23,7 @@ shinyUI(pageWithSidebar(
                           Only market prices are considered, self-build dwellings are therefore excluded. 
                           The land component is included."),
                 hr(),
-                helpText ("Try it out and select one of the abbreviated country codes:"),
-                countries <-sort(unique(tmp$geo)),
-                hr(),
+                helpText ("Try it out and select a country:"),
                 selectInput('geo', 'Give it a go and select a country:', countries),
                 hr(),
                 helpText("Data from EuroStat - House Price Index (2010 =100) - quarterly data.")
